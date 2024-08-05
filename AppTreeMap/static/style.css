@@ -1,0 +1,142 @@
+body {
+            font-family: Arial, sans-serif;
+            background-color: black;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+        }
+
+        #treemap {
+            margin-top: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            width: min-content;
+        }
+
+        .crypto {
+            color: #fff;
+            border-radius: 1px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.3s;
+            text-align: center;
+            margin: 1px;
+        }
+
+        .crypto:hover {
+            transform: scale(1.05);
+        }
+
+        .crypto > .symbol {
+            color: #f0f0f0;
+            font-size: 0.5em;
+        }
+
+        .crypto > .market-cap-percentage {
+            color: #f0f0f0;
+            font-size: 0.5em;
+        }
+
+        #loadDataButton {
+            background-color: #0d1b8d;
+            color: #fff;
+            border: none;
+            border-radius: 1px;
+            padding: 10px 20px;
+            font-size: 0.7em;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.3s;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        #loadDataButton:hover {
+            background-color: #0056b3;
+            transform: scale(1.05);
+        }
+
+        #loadDataButton:active {
+            background-color: #004494;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .form-container {
+            width: 100%;
+            max-width: -webkit-fill-available;
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #1e1e1e;
+            border-radius: 1px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-container h1 {
+            color: #fff;
+            font-size: 15px
+        }
+
+        .form-container form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-container form input,
+        .form-container form textarea {
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #333;
+            border-radius: 5px;
+            color: black;
+            width: 95%;
+        }
+
+        .form-container form button {
+            background-color: #0d1b8d;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            padding: 10px;
+            font-size: 0.7em;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.3s;
+        }
+
+        .form-container form button:hover {
+            background-color: #0056b3;
+            transform: scale(1.05);
+        }
+
+        .form-container form button:active {
+            background-color: #004494;
+        }
+
+        .form-container #formMessage {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .form-container #formMessage.success {
+            color: #28a745;
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+
+        .form-container #formMessage.error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+    <title>Crypto Treemap</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <button id="loadDataButton" title="Recomendação de uso a cada 40 segundos.">Atualizar</button>
+        <div id="treemap"></div>
+        <div class="form-container">
+            <h1>Comentários</h1>
+            <form id="saveDetailForm" method="post" action="{% url 'save_data' %}">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button type="submit">Save</button>
+            </form>
+            <div id="formMessage" style="color: white; margin-top: 10px;"></div>
+        </div>
+    </div>
+    <script>
+        $(document).ready(function() {
+            function loadCryptoData() {
+                $.ajax({
+                    url: '/api/crypto?limit=10',
+                    method: 'GET',
+                    success: function(data) {
+                        const treemap = $('#treemap');
+                        treemap.empty(); // Clear previous data
+
+                        const cryptos = data.treemap;
+
+                        // Define base size
+                        const baseSize = 50; // Base size in pixels
+                        const totalMarketCap = cryptos.reduce((acc, crypto) => acc + crypto.market_cap, 0);
+
+                        // Calculate total area and size per unit of market cap
+                        const totalArea = baseSize * baseSize;
+                        const sizePerUnit = totalArea / totalMarketCap;
+
+                        let currentTop = 0;
+                        let currentLeft = 0;
+                        let currentRowHeight = 0;
+                        const maxRowWidth = 550; // Max width in pixels for each row
+
+                        function formatCurrency(num) {
+                            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num);
+                        }
+
+                        cryptos.forEach(crypto => {
+                            const marketCapPercentage = ((crypto.market_cap / totalMarketCap) * 100).toFixed(2) + '%';
+
+                            const cryptoDiv = $('<div class="crypto" title="'  + 'A capitalização de mercado de '+ crypto.name+ ': ' + formatCurrency(crypto.market_cap) + '"></div>');
+
+                            const symbolDiv = $('<div class="symbol"></div>').text(crypto.symbol);
+                            const marketCapPercentageDiv = $('<div class="market-cap-percentage"></div>').text(marketCapPercentage);
+
+                            cryptoDiv.append(marketCapPercentageDiv);
+                            cryptoDiv.append(symbolDiv);
+
+                            const size = crypto.market_cap * sizePerUnit;
+                            const width = Math.min(size, maxRowWidth - currentLeft);
+                            const height = width;
+
+                            const color = crypto.current_market_cap > crypto.previous_market_cap ? '#28a745' : '#dc3545';
+
+                            cryptoDiv.css({
+                                width: width + 'px',
+                                height: height + 'px',
+                                top: currentTop + 'px',
+                                left: currentLeft + 'px',
+                                backgroundColor: color
+                            });
+
+                            treemap.append(cryptoDiv);
+
+                            currentLeft += width;
+
+                            if (currentLeft >= maxRowWidth) {
+                                currentLeft = 0;
+                                currentTop += currentRowHeight;
+                                currentRowHeight = height;
+                            } else {
+                                currentRowHeight = Math.max(currentRowHeight, height);
+                            }
+                        });
+                    },
+                    error: function(error) {
+                        console.error('Error fetching crypto data:', error);
+                    }
+                });
+            }
+
+            // Load data when the page loads
+            loadCryptoData();
+
+            // Reload data when the button is clicked
+            $('#loadDataButton').click(function() {
+                loadCryptoData();
+            });
+
+            // Handle form submission
+            $('#saveDetailForm').on('submit', function(event) {
+                event.preventDefault(); // Prevent the default form submission
+
+                $.ajax({
+                    url: $(this).attr('action'),
+                    method: 'POST',
+                    data: $(this).serialize(),
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            $('#formMessage').text('Os dados foram salvos com sucesso!');
+                        } else {
+                            $('#formMessage').text('Erro ao salvar: ' + response.message);
+                        }
+                    },
+                    error: function(xhr) {
+                        $('#formMessage').text('An error occurred: ' + xhr.status + ' ' + xhr.statusText);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
