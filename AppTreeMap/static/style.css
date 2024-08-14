@@ -1,21 +1,76 @@
-body {
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+        body {
             font-family: Arial, sans-serif;
             background-color: black;
-            color: #333;
+            color: #f0f0f0;
             margin: 0;
             padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
             box-sizing: border-box;
+            font-size: 0.8em;
+        }
+
+        .content{
+            display: flex;
+        }
+
+        .ranking h1 {
+            font-family: 'Orbitron', sans-serif;
+            color: #0ff;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            background: linear-gradient(90deg, #00f, #0ff, #0f0);
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+
+        #dataDisplay {
+            padding: 18px;
+        }
+
+        #dataDisplay .crypto-data {
+            background-color: #fff;
+            border: 1px solid #1e1e1e;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        #dataDisplay .crypto-data h2 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 24px;
+            color: #0d6efd;
+            margin-bottom: 10px;
+        }
+
+        #dataDisplay .crypto-data p {
+            font-size: 16px;
+            margin: 5px 0;
+        }
+
+        #dataDisplay .crypto-data .market-cap {
+            color: #28a745;
+        }
+
+        #dataDisplay .crypto-data .previous-market-cap {
+            color: #dc3545;
+        }
+
+        .market-cap-up {
+            color: #28a745;
+        }
+
+        .market-cap-down {
+            color: #dc3545;
         }
 
         #treemap {
             margin-top: 20px;
             display: flex;
             flex-wrap: wrap;
-            width: min-content;
         }
 
         .crypto {
@@ -37,12 +92,12 @@ body {
 
         .crypto > .symbol {
             color: #f0f0f0;
-            font-size: 0.5em;
+            font-size: 0.8em;
         }
 
         .crypto > .market-cap-percentage {
             color: #f0f0f0;
-            font-size: 0.5em;
+            font-size: 0.8em;
         }
 
         #loadDataButton {
@@ -54,7 +109,7 @@ body {
             font-size: 0.7em;
             cursor: pointer;
             transition: background-color 0.3s, transform 0.3s;
-            width: 100%;
+            width: 97%;
             margin-top: 20px;
         }
 
@@ -70,11 +125,10 @@ body {
         .container {
             display: flex;
             flex-direction: column;
-            align-items: center;
         }
 
         .form-container {
-            width: 100%;
+            width: 94%;
             max-width: -webkit-fill-available;
             margin-top: 20px;
             padding: 20px;

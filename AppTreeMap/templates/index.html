@@ -5,21 +5,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{% static 'style.css' %}">
-    <title>Crypto Treemap</title>
+    <title>Top criptos</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
-    <div class="container">
-        <button id="loadDataButton" title="Recomendação de uso a cada 40 segundos.">Atualizar</button>
-        <div id="treemap"></div>
-        <div class="form-container">
-            <h1>Comentários</h1>
-            <form id="saveDetailForm" method="post" action="{% url 'save_data' %}">
-                {% csrf_token %}
-                {{ form.as_p }}
-                <button type="submit">Save</button>
-            </form>
-            <div id="formMessage" style="color: white; margin-top: 10px;"></div>
+    <div class="content">
+        <div class="ranking">
+            <h1>Top criptos</h1>
+            <div id="dataDisplay"></div> <!-- Div para exibir dados da API -->
+        </div>
+        <div class="container">
+            <div id="treemap"></div>
+            <button id="loadDataButton" title="Recomendação de uso a cada 40 segundos.">Atualizar o mercado</button>
+            <div class="form-container">
+                <h1>Análise do mercado</h1>
+                <form id="saveDetailForm" method="post" action="{% url 'save_data' %}">
+                    {% csrf_token %}
+                    {{ form.as_p }}
+                    <button type="submit">Save</button>
+                </form>
+                <div id="formMessage" style="color: white; margin-top: 10px;"></div>
+            </div>
         </div>
     </div>
     <script>
@@ -30,7 +36,9 @@
                     method: 'GET',
                     success: function(data) {
                         const treemap = $('#treemap');
-                        treemap.empty(); // Clear previous data
+                        const dataDisplay = $('#dataDisplay'); // Seletor para a nova div
+                        treemap.empty(); // Limpar dados anteriores
+                        dataDisplay.empty(); // Limpar dados anteriores
 
                         const cryptos = data.treemap;
 
@@ -52,12 +60,18 @@
                         }
 
                         cryptos.forEach(crypto => {
-                            const marketCapPercentage = ((crypto.market_cap / totalMarketCap) * 100).toFixed(2) + '%';
+                            const marketCapPercentage = ((crypto.market_cap / totalMarketCap) * 100).toFixed(2);
+                            const marketCapPercentageText = marketCapPercentage >= 1 ? marketCapPercentage + '%' : '';
+                            const symbolFontSize = marketCapPercentage >= 2 ? '1.2em' : '0.5em';
 
-                            const cryptoDiv = $('<div class="crypto" title="'  + 'A capitalização de mercado de '+ crypto.name+ ': ' + formatCurrency(crypto.market_cap) + '"></div>');
+                            const cryptoDiv = $('<div class="crypto" title="' + 'A capitalização de mercado de ' + crypto.name + ': ' + formatCurrency(crypto.market_cap) + '"></div>');
 
-                            const symbolDiv = $('<div class="symbol"></div>').text(crypto.symbol);
-                            const marketCapPercentageDiv = $('<div class="market-cap-percentage"></div>').text(marketCapPercentage);
+                            const symbolDiv = $('<div class="symbol"></div>').text(crypto.symbol).css({
+                                fontSize: symbolFontSize
+                            });
+                            const marketCapPercentageDiv = $('<div class="market-cap-percentage"></div>').text(marketCapPercentageText).css({
+                                fontSize: symbolFontSize
+                            });;
 
                             cryptoDiv.append(marketCapPercentageDiv);
                             cryptoDiv.append(symbolDiv);
@@ -66,7 +80,7 @@
                             const width = Math.min(size, maxRowWidth - currentLeft);
                             const height = width;
 
-                            const color = crypto.current_market_cap > crypto.previous_market_cap ? '#28a745' : '#dc3545';
+                            const color = crypto.market_cap > crypto.previous_market_cap ? '#28a745' : '#dc3545';
 
                             cryptoDiv.css({
                                 width: width + 'px',
@@ -88,6 +102,19 @@
                                 currentRowHeight = Math.max(currentRowHeight, height);
                             }
                         });
+
+                        // Display data in the new div
+                        const dataHtml = cryptos.map(crypto => {
+                            const marketCapClass = crypto.market_cap > crypto.previous_market_cap ? 'market-cap-up' : 'market-cap-down';
+
+                            return `<div class="crypto-data">
+                                <h2>${crypto.name} (${crypto.symbol})</h2>
+                                <p class="${marketCapClass}">Capitalização de mercado: ${formatCurrency(crypto.market_cap)}</p>
+                                <p class="${marketCapClass}">Capitalização de mercado anterior: ${formatCurrency(crypto.previous_market_cap)}</p>
+                            </div>`;
+                        }).join('');
+
+                        dataDisplay.html(dataHtml);
                     },
                     error: function(error) {
                         console.error('Error fetching crypto data:', error);

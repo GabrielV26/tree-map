@@ -4,6 +4,7 @@ from .models import SaveDetail
 from .forms import SaveDetailForm
 import requests
 import json
+import os
 
 
 def index(request):
@@ -13,6 +14,19 @@ def index(request):
 
 # API free do CoinMarketCap
 API_KEY = '2767653c-9b83-4202-8d26-7c26afde4c8c'
+DATA_FILE = 'crypto_data.json'
+
+
+def load_previous_data():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, 'r') as f:
+            return json.load(f)
+    return {}
+
+
+def save_current_data(data):
+    with open(DATA_FILE, 'w') as f:
+        json.dump(data, f)
 
 
 def get_crypto_data(api_key, limit=10):
@@ -29,7 +43,17 @@ def get_crypto_data(api_key, limit=10):
 
     response = requests.get(url, headers=headers, params=params)
     if response.status_code == 200:
-        return response.json()['data']
+        current_data = response.json()['data']
+
+        previous_data = load_previous_data()
+        for crypto in current_data:
+            symbol = crypto['symbol']
+            crypto['previous_market_cap'] = previous_data.get(symbol, {}).get('market_cap', 0)
+
+        # Save the current data for future comparison
+        save_current_data({crypto['symbol']: {'market_cap': crypto['quote']['USD']['market_cap']} for crypto in current_data})
+
+        return current_data
     else:
         return None
 
@@ -43,7 +67,8 @@ def get_data(request):
             {
                 'name': crypto['name'],
                 'symbol': crypto['symbol'],
-                'market_cap': crypto['quote']['USD']['market_cap']
+                'market_cap': crypto['quote']['USD']['market_cap'],
+                'previous_market_cap': crypto['previous_market_cap']
             }
             for crypto in crypto_data
         ]
