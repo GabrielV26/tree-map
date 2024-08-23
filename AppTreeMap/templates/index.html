@@ -5,59 +5,86 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{% static 'style.css' %}">
-    <title>Crypto Treemap</title>
+    <title>Top criptos</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
-    <div class="container">
-        <button id="loadDataButton" title="Recomendação de uso a cada 40 segundos.">Atualizar</button>
-        <div id="treemap"></div>
-        <div class="form-container">
-            <h1>Comentários</h1>
-            <form id="saveDetailForm" method="post" action="{% url 'save_data' %}">
-                {% csrf_token %}
-                {{ form.as_p }}
-                <button type="submit">Save</button>
-            </form>
-            <div id="formMessage" style="color: white; margin-top: 10px;"></div>
+    <div class="content">
+        <div class="ranking">
+            <h1>Top criptos</h1>
+            <div id="dataDisplay"></div> <!-- Div para exibir dados da API -->
+        </div>
+        <div class="container">
+            <div id="treemap"></div>
+            <button id="loadDataButton" title="Recomendação de uso a cada 40 segundos.">Atualizar o mercado</button>
+            <div class="form-container">
+                <h2>Criar análise do mercado</h2>
+                <form id="saveDetailForm" method="post" action="{% url 'save_data' %}">
+                    {% csrf_token %}
+                    {{ form.as_p }}
+                    <button type="submit">Salvar</button>
+                </form>
+                <div id="formMessage" style="color: white; margin-top: 10px;"></div>
+            </div>
+            <div id="savedDataContainer">
+                <h2>Últimas Análises</h2>
+                {% for item in data_form %}
+                    <div class="saved-data-item" data-id="{{ item.id }}">
+                        <p><strong>Criado em:</strong> {{ item.created_at|date:"d/m/Y H:i:s" }}</p>
+                        <p><strong>Anotações:</strong> {{ item.text }}</p>
+                        <button class="delete-button" data-id="{{ item.id }}">Remover</button>
+                    </div>
+                {% endfor %}
+            </div>
         </div>
     </div>
     <script>
         $(document).ready(function() {
+            // Função para carregar dados de criptomoedas
             function loadCryptoData() {
                 $.ajax({
-                    url: '/api/crypto?limit=10',
+                    url: '{% url "get_data" %}?limit=10',
                     method: 'GET',
                     success: function(data) {
                         const treemap = $('#treemap');
-                        treemap.empty(); // Clear previous data
+                        const dataDisplay = $('#dataDisplay'); // Seletor para a nova div
+                        treemap.empty(); // Limpar dados anteriores
+                        dataDisplay.empty(); // Limpar dados anteriores
 
                         const cryptos = data.treemap;
 
-                        // Define base size
-                        const baseSize = 50; // Base size in pixels
+                        // Definir tamanho base
+                        const baseSize = 50; // Tamanho base em pixels
                         const totalMarketCap = cryptos.reduce((acc, crypto) => acc + crypto.market_cap, 0);
 
-                        // Calculate total area and size per unit of market cap
+                        // Calcular área total e tamanho por unidade de market cap
                         const totalArea = baseSize * baseSize;
                         const sizePerUnit = totalArea / totalMarketCap;
 
                         let currentTop = 0;
                         let currentLeft = 0;
                         let currentRowHeight = 0;
-                        const maxRowWidth = 550; // Max width in pixels for each row
+                        const maxRowWidth = 550; // Largura máxima em pixels para cada linha
 
+                        // Função para formatar valores monetários
                         function formatCurrency(num) {
                             return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num);
                         }
 
+                        // Iterar sobre os dados de criptomoedas
                         cryptos.forEach(crypto => {
-                            const marketCapPercentage = ((crypto.market_cap / totalMarketCap) * 100).toFixed(2) + '%';
+                            const marketCapPercentage = ((crypto.market_cap / totalMarketCap) * 100).toFixed(2);
+                            const marketCapPercentageText = marketCapPercentage >= 1 ? marketCapPercentage + '%' : '';
+                            const symbolFontSize = marketCapPercentage >= 2 ? '1.2em' : '0.5em';
 
-                            const cryptoDiv = $('<div class="crypto" title="'  + 'A capitalização de mercado de '+ crypto.name+ ': ' + formatCurrency(crypto.market_cap) + '"></div>');
+                            const cryptoDiv = $('<div class="crypto" title="' + 'A capitalização de mercado de ' + crypto.name + ': ' + formatCurrency(crypto.market_cap) + '"></div>');
 
-                            const symbolDiv = $('<div class="symbol"></div>').text(crypto.symbol);
-                            const marketCapPercentageDiv = $('<div class="market-cap-percentage"></div>').text(marketCapPercentage);
+                            const symbolDiv = $('<div class="symbol"></div>').text(crypto.symbol).css({
+                                fontSize: symbolFontSize
+                            });
+                            const marketCapPercentageDiv = $('<div class="market-cap-percentage"></div>').text(marketCapPercentageText).css({
+                                fontSize: symbolFontSize
+                            });
 
                             cryptoDiv.append(marketCapPercentageDiv);
                             cryptoDiv.append(symbolDiv);
@@ -66,7 +93,7 @@
                             const width = Math.min(size, maxRowWidth - currentLeft);
                             const height = width;
 
-                            const color = crypto.current_market_cap > crypto.previous_market_cap ? '#28a745' : '#dc3545';
+                            const color = crypto.market_cap > crypto.previous_market_cap ? '#28a745' : '#dc3545';
 
                             cryptoDiv.css({
                                 width: width + 'px',
@@ -88,24 +115,37 @@
                                 currentRowHeight = Math.max(currentRowHeight, height);
                             }
                         });
+
+                        // Exibir dados na nova div
+                        const dataHtml = cryptos.map(crypto => {
+                            const marketCapClass = crypto.market_cap > crypto.previous_market_cap ? 'market-cap-up' : 'market-cap-down';
+
+                            return `<div class="crypto-data">
+                                <h2>${crypto.name} (${crypto.symbol})</h2>
+                                <p class="${marketCapClass}">Capitalização de mercado: ${formatCurrency(crypto.market_cap)}</p>
+                                <p class="${marketCapClass}">Capitalização de mercado anterior: ${formatCurrency(crypto.previous_market_cap)}</p>
+                            </div>`;
+                        }).join('');
+
+                        dataDisplay.html(dataHtml);
                     },
                     error: function(error) {
-                        console.error('Error fetching crypto data:', error);
+                        console.error('Erro ao buscar dados de criptomoedas:', error);
                     }
                 });
             }
 
-            // Load data when the page loads
+            // Carregar dados quando a página é carregada
             loadCryptoData();
 
-            // Reload data when the button is clicked
+            // Recarregar dados quando o botão é clicado
             $('#loadDataButton').click(function() {
                 loadCryptoData();
             });
 
-            // Handle form submission
+            // Manipular envio do formulário
             $('#saveDetailForm').on('submit', function(event) {
-                event.preventDefault(); // Prevent the default form submission
+                event.preventDefault(); // Prevenir envio padrão do formulário
 
                 $.ajax({
                     url: $(this).attr('action'),
@@ -113,16 +153,61 @@
                     data: $(this).serialize(),
                     success: function(response) {
                         if (response.status === 'success') {
-                            $('#formMessage').text('Os dados foram salvos com sucesso!');
+                            $('#formMessage').text('Análise salva com sucesso!');
+
+                            // Adicionar novos dados ao contêiner de dados salvos
+                            const newItem = $('<div class="saved-data-item"></div>').html(
+                                '<p><strong>Agora</strong></p>' +
+                                '<p><strong>Anotações:</strong> ' + response.text + '</p>'
+                            );
+                            $('#savedDataContainer').prepend(newItem);
+
+                            // Anexar manipulador de evento de exclusão ao novo botão
+                            attachDeleteEvent(newItem.find('.delete-button'));
                         } else {
                             $('#formMessage').text('Erro ao salvar: ' + response.message);
                         }
                     },
                     error: function(xhr) {
-                        $('#formMessage').text('An error occurred: ' + xhr.status + ' ' + xhr.statusText);
+                        $('#formMessage').text('Ocorreu um erro: ' + xhr.status + ' ' + xhr.statusText);
                     }
                 });
             });
+
+            // Anexar manipulador de evento de exclusão aos botões de exclusão
+            function attachDeleteEvent(buttons) {
+                buttons.each(function() {
+                    $(this).on('click', function() {
+                        if (!confirm('Você realmente deseja deletar este item?')) {
+                            return;
+                        }
+
+                        const id = $(this).data('id');
+
+                        $.ajax({
+                            url: `/delete_data/${id}/`,
+                            method: 'POST',
+                            headers: {
+                                'X-CSRFToken': '{{ csrf_token }}'
+                            },
+                            success: function(data) {
+                                if (data.status === 'success') {
+                                    $(`div[data-id="${id}"]`).remove();
+                                    alert('Dados deletados com sucesso.');
+                                } else {
+                                    alert('Erro ao deletar dados: ' + data.message);
+                                }
+                            },
+                            error: function(xhr) {
+                                alert('Ocorreu um erro: ' + xhr.status + ' ' + xhr.statusText);
+                            }
+                        });
+                    });
+                });
+            }
+
+            // Anexar manipulador de evento de exclusão aos botões existentes
+            attachDeleteEvent($('.delete-button'));
         });
     </script>
 </body>
