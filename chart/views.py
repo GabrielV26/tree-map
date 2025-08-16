@@ -23,7 +23,7 @@ def index(request):
 
 
 # Chave da API do CoinMarketCap
-API_KEY = '2767653c-9b83-4202-8d26-7c26afde4c8c'
+API_KEY = 'Cole sua API do CoinMarketCap'
 
 DATA_FILE = 'crypto_data.json'
 
