@@ -18,6 +18,8 @@ Para mais detalhes sobre a API, consulte a [documentação oficial](https://coin
 
 4. Aplique as migrações: python manage.py migrate
 
-5. Inicie o servidor: python manage.py runserver
+5. Adicione sua API do CoinMarketCap -> chart/views.py -> "API_KEY = " 
 
-6. Acesse no navegador: http://127.0.0.1:8000/
+6. Inicie o servidor: python manage.py runserver
+
+7. Acesse no navegador: http://127.0.0.1:8000/
