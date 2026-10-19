@@ -5,7 +5,6 @@ from pathlib import Path
 
 import requests
 from django.conf import settings
-from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
@@ -134,9 +133,10 @@ def get_data(request):
     return JsonResponse({"treemap": processed_data})
 
 
-@login_required
 @require_POST
 def save_data(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"status": "error", "message": "Autenticação necessária."}, status=401)
     form = SaveDetailForm(request.POST)
     if not form.is_valid():
         return JsonResponse({"status": "error", "message": form.errors.get_json_data()}, status=400)
@@ -144,9 +144,10 @@ def save_data(request):
     return JsonResponse({"status": "success", "id": detail.id, "text": detail.text})
 
 
-@login_required
 @require_POST
 def delete_data(request, id):
+    if not request.user.is_authenticated:
+        return JsonResponse({"status": "error", "message": "Autenticação necessária."}, status=401)
     detail = get_object_or_404(SaveDetail, id=id)
     detail.delete()
     return JsonResponse({"status": "success", "message": "Análise removida."})
