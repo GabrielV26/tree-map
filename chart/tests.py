@@ -36,11 +36,11 @@ class TreemapSecurityTests(TestCase):
     def test_save_and_delete_require_login(self):
         self.client.logout()
         response = self.client.post("/save/", {"text": "private note"})
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 401)
 
         detail = SaveDetail.objects.create(text="note")
         response = self.client.post(f"/delete_data/{detail.id}/")
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 401)
         self.assertTrue(SaveDetail.objects.filter(id=detail.id).exists())
 
     def test_save_returns_record_id(self):
