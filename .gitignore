@@ -1,2 +1,20 @@
-*.venv
-*db.sqlite3
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Django/local data
+db.sqlite3
+crypto_data.json
+staticfiles/
+
+# Editors/OS
+.vscode/
+.idea/
+.DS_Store
