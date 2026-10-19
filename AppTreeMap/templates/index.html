@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 {% load static %}
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -19,6 +19,7 @@
             <button id="loadDataButton" title="Recomendação de uso a cada 40 segundos.">Atualizar o mercado</button>
             <div class="form-container">
                 <h2>Criar análise do mercado</h2>
+                <p>Para salvar ou remover análises, faça login pela <a href="/admin/login/">área de administração</a>.</p>
                 <form id="saveDetailForm" method="post" action="{% url 'save_data' %}">
                     {% csrf_token %}
                     {{ form.as_p }}
@@ -39,175 +40,146 @@
         </div>
     </div>
     <script>
-        $(document).ready(function() {
-            // Função para carregar dados de criptomoedas
+        $(function() {
+            const csrfToken = $('[name=csrfmiddlewaretoken]').val();
+
+            function formatCurrency(num) {
+                return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num);
+            }
+
             function loadCryptoData() {
                 $.ajax({
                     url: '{% url "get_data" %}?limit=10',
                     method: 'GET',
+                    timeout: 12000,
                     success: function(data) {
-                        const treemap = $('#treemap');
-                        const dataDisplay = $('#dataDisplay'); // Seletor para a nova div
-                        treemap.empty(); // Limpar dados anteriores
-                        dataDisplay.empty(); // Limpar dados anteriores
-
-                        const cryptos = data.treemap;
-
-                        // Definir tamanho base
-                        const baseSize = 50; // Tamanho base em pixels
-                        const totalMarketCap = cryptos.reduce((acc, crypto) => acc + crypto.market_cap, 0);
-
-                        // Calcular área total e tamanho por unidade de market cap
-                        const totalArea = baseSize * baseSize;
-                        const sizePerUnit = totalArea / totalMarketCap;
-
-                        let currentTop = 0;
-                        let currentLeft = 0;
-                        let currentRowHeight = 0;
-                        const maxRowWidth = 550; // Largura máxima em pixels para cada linha
-
-                        // Função para formatar valores monetários
-                        function formatCurrency(num) {
-                            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num);
+                        const treemap = $('#treemap').empty();
+                        const dataDisplay = $('#dataDisplay').empty();
+                        const cryptos = Array.isArray(data.treemap) ? data.treemap : [];
+                        if (!cryptos.length) {
+                            dataDisplay.text('Nenhum dado de mercado disponível.');
+                            return;
                         }
 
-                        // Iterar sobre os dados de criptomoedas
-                        cryptos.forEach(crypto => {
-                            const marketCapPercentage = ((crypto.market_cap / totalMarketCap) * 100).toFixed(2);
-                            const marketCapPercentageText = marketCapPercentage >= 1 ? marketCapPercentage + '%' : '';
-                            const symbolFontSize = marketCapPercentage >= 2 ? '1.2em' : '0.5em';
+                        const totalMarketCap = cryptos.reduce((sum, crypto) => sum + Number(crypto.market_cap || 0), 0);
+                        if (!Number.isFinite(totalMarketCap) || totalMarketCap <= 0) {
+                            dataDisplay.text('Os dados recebidos não permitem montar o gráfico.');
+                            return;
+                        }
 
-                            const cryptoDiv = $('<div class="crypto" title="' + 'A capitalização de mercado de ' + crypto.name + ': ' + formatCurrency(crypto.market_cap) + '"></div>');
+                        const totalArea = 550 * 300;
+                        const sizePerUnit = totalArea / totalMarketCap;
+                        let currentTop = 0, currentLeft = 0, currentRowHeight = 0;
+                        const maxRowWidth = 550;
 
-                            const symbolDiv = $('<div class="symbol"></div>').text(crypto.symbol).css({
-                                fontSize: symbolFontSize
-                            });
-                            const marketCapPercentageDiv = $('<div class="market-cap-percentage"></div>').text(marketCapPercentageText).css({
-                                fontSize: symbolFontSize
-                            });
+                        cryptos.forEach(function(crypto) {
+                            const marketCap = Number(crypto.market_cap || 0);
+                            const previousMarketCap = Number(crypto.previous_market_cap || 0);
+                            if (!Number.isFinite(marketCap) || marketCap < 0) return;
 
-                            cryptoDiv.append(marketCapPercentageDiv);
-                            cryptoDiv.append(symbolDiv);
+                            const percentage = (marketCap / totalMarketCap) * 100;
+                            const cryptoDiv = $('<div>').addClass('crypto').attr(
+                                'title', 'A capitalização de mercado de ' + String(crypto.name) + ': ' + formatCurrency(marketCap)
+                            );
+                            const symbolDiv = $('<div>').addClass('symbol').text(String(crypto.symbol));
+                            const percentageDiv = $('<div>').addClass('market-cap-percentage').text(percentage >= 1 ? percentage.toFixed(2) + '%' : '');
+                            symbolDiv.css('fontSize', percentage >= 2 ? '1.2em' : '0.5em');
+                            percentageDiv.css('fontSize', percentage >= 2 ? '1.2em' : '0.5em');
+                            cryptoDiv.append(percentageDiv, symbolDiv);
 
-                            const size = crypto.market_cap * sizePerUnit;
-                            const width = Math.min(size, maxRowWidth - currentLeft);
+                            const size = Math.max(1, Math.sqrt(marketCap * sizePerUnit));
+                            const width = Math.max(1, Math.min(size, maxRowWidth - currentLeft));
                             const height = width;
-
-                            const color = crypto.market_cap > crypto.previous_market_cap ? '#28a745' : '#dc3545';
-
                             cryptoDiv.css({
                                 width: width + 'px',
                                 height: height + 'px',
                                 top: currentTop + 'px',
                                 left: currentLeft + 'px',
-                                backgroundColor: color
+                                backgroundColor: marketCap >= previousMarketCap ? '#28a745' : '#dc3545'
                             });
-
                             treemap.append(cryptoDiv);
-
                             currentLeft += width;
-
+                            currentRowHeight = Math.max(currentRowHeight, height);
                             if (currentLeft >= maxRowWidth) {
                                 currentLeft = 0;
                                 currentTop += currentRowHeight;
-                                currentRowHeight = height;
-                            } else {
-                                currentRowHeight = Math.max(currentRowHeight, height);
+                                currentRowHeight = 0;
                             }
                         });
 
-                        // Exibir dados na nova div
-                        const dataHtml = cryptos.map(crypto => {
-                            const marketCapClass = crypto.market_cap > crypto.previous_market_cap ? 'market-cap-up' : 'market-cap-down';
-
-                            return `<div class="crypto-data">
-                                <h2>${crypto.name} (${crypto.symbol})</h2>
-                                <p class="${marketCapClass}">Capitalização de mercado: ${formatCurrency(crypto.market_cap)}</p>
-                                <p class="${marketCapClass}">Capitalização de mercado anterior: ${formatCurrency(crypto.previous_market_cap)}</p>
-                            </div>`;
-                        }).join('');
-
-                        dataDisplay.html(dataHtml);
+                        cryptos.forEach(function(crypto) {
+                            const marketCap = Number(crypto.market_cap || 0);
+                            const previous = Number(crypto.previous_market_cap || 0);
+                            const item = $('<div>').addClass('crypto-data');
+                            $('<h2>').text(String(crypto.name) + ' (' + String(crypto.symbol) + ')').appendTo(item);
+                            $('<p>').addClass(marketCap >= previous ? 'market-cap-up' : 'market-cap-down')
+                                .text('Capitalização de mercado: ' + formatCurrency(marketCap)).appendTo(item);
+                            $('<p>').addClass(marketCap >= previous ? 'market-cap-up' : 'market-cap-down')
+                                .text('Capitalização de mercado anterior: ' + formatCurrency(previous)).appendTo(item);
+                            dataDisplay.append(item);
+                        });
                     },
-                    error: function(error) {
-                        console.error('Erro ao buscar dados de criptomoedas:', error);
+                    error: function(xhr) {
+                        const message = xhr.responseJSON && xhr.responseJSON.error
+                            ? xhr.responseJSON.error
+                            : 'Não foi possível carregar os dados do mercado.';
+                        $('#dataDisplay').text(message);
                     }
                 });
             }
 
-            // Carregar dados quando a página é carregada
-            loadCryptoData();
-
-            // Recarregar dados quando o botão é clicado
-            $('#loadDataButton').click(function() {
-                loadCryptoData();
-            });
-
-            // Manipular envio do formulário
-            $('#saveDetailForm').on('submit', function(event) {
-                event.preventDefault(); // Prevenir envio padrão do formulário
-
-                $.ajax({
-                    url: $(this).attr('action'),
-                    method: 'POST',
-                    data: $(this).serialize(),
-                    success: function(response) {
-                        if (response.status === 'success') {
-                            $('#formMessage').text('Análise salva com sucesso!');
-
-                            // Adicionar novos dados ao contêiner de dados salvos
-                            const newItem = $('<div class="saved-data-item"></div>').html(
-                                '<p><strong>Agora</strong></p>' +
-                                '<p><strong>Anotações:</strong> ' + response.text + '</p>'
-                            );
-                            $('#savedDataContainer').prepend(newItem);
-
-                            // Anexar manipulador de evento de exclusão ao novo botão
-                            attachDeleteEvent(newItem.find('.delete-button'));
-                        } else {
-                            $('#formMessage').text('Erro ao salvar: ' + response.message);
-                        }
-                    },
-                    error: function(xhr) {
-                        $('#formMessage').text('Ocorreu um erro: ' + xhr.status + ' ' + xhr.statusText);
-                    }
-                });
-            });
-
-            // Anexar manipulador de evento de exclusão aos botões de exclusão
             function attachDeleteEvent(buttons) {
-                buttons.each(function() {
-                    $(this).on('click', function() {
-                        if (!confirm('Você realmente deseja deletar este item?')) {
-                            return;
-                        }
-
-                        const id = $(this).data('id');
-
-                        $.ajax({
-                            url: `/delete_data/${id}/`,
-                            method: 'POST',
-                            headers: {
-                                'X-CSRFToken': '{{ csrf_token }}'
-                            },
-                            success: function(data) {
-                                if (data.status === 'success') {
-                                    $(`div[data-id="${id}"]`).remove();
-                                    alert('Dados deletados com sucesso.');
-                                } else {
-                                    alert('Erro ao deletar dados: ' + data.message);
-                                }
-                            },
-                            error: function(xhr) {
-                                alert('Ocorreu um erro: ' + xhr.status + ' ' + xhr.statusText);
+                buttons.off('click').on('click', function() {
+                    if (!confirm('Você realmente deseja remover esta análise?')) return;
+                    const button = $(this);
+                    const id = button.data('id');
+                    $.ajax({
+                        url: '/delete_data/' + encodeURIComponent(id) + '/',
+                        method: 'POST',
+                        headers: {'X-CSRFToken': csrfToken},
+                        success: function() {
+                            $('.saved-data-item[data-id="' + id + '"]').remove();
+                        },
+                        error: function(xhr) {
+                            if (xhr.status === 302 || xhr.status === 401 || xhr.status === 403) {
+                                alert('Entre na área administrativa do Django para autenticar antes de remover análises.');
+                            } else {
+                                alert('Não foi possível remover a análise. Código: ' + xhr.status);
                             }
-                        });
+                        }
                     });
                 });
             }
 
-            // Anexar manipulador de evento de exclusão aos botões existentes
+            $('#loadDataButton').on('click', loadCryptoData);
+            $('#saveDetailForm').on('submit', function(event) {
+                event.preventDefault();
+                const form = $(this);
+                $.ajax({
+                    url: form.attr('action'),
+                    method: 'POST',
+                    data: form.serialize(),
+                    success: function(response) {
+                        $('#formMessage').text('Análise salva com sucesso.');
+                        const item = $('<div>').addClass('saved-data-item').attr('data-id', response.id);
+                        $('<p>').append($('<strong>').text('Anotações: ')).append(document.createTextNode(String(response.text))).appendTo(item);
+                        $('<button>').addClass('delete-button').attr('type', 'button').attr('data-id', response.id).text('Remover').appendTo(item);
+                        $('#savedDataContainer').prepend(item);
+                        attachDeleteEvent(item.find('.delete-button'));
+                        form[0].reset();
+                    },
+                    error: function(xhr) {
+                        if (xhr.status === 302 || xhr.status === 401 || xhr.status === 403) {
+                            $('#formMessage').text('Faça login pela área administrativa do Django para salvar análises.');
+                        } else {
+                            $('#formMessage').text('Não foi possível salvar a análise. Verifique os dados e tente novamente.');
+                        }
+                    }
+                });
+            });
+
             attachDeleteEvent($('.delete-button'));
+            loadCryptoData();
         });
     </script>
 </body>
