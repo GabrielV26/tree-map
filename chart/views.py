@@ -1,114 +1,152 @@
-from django.shortcuts import render, get_object_or_404
-from django.http import JsonResponse, HttpResponseBadRequest
-from .models import SaveDetail
-from .forms import SaveDetailForm
-from django.utils import timezone
-import requests
 import json
 import os
+import tempfile
+from pathlib import Path
+
+import requests
+from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponseBadRequest, JsonResponse
+from django.shortcuts import get_object_or_404, render
+from django.utils import timezone
+from django.views.decorators.http import require_GET, require_POST
+
+from .forms import SaveDetailForm
+from .models import SaveDetail
+
+DATA_FILE = Path(settings.BASE_DIR) / "crypto_data.json"
+COINMARKETCAP_URL = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest"
+MAX_CRYPTO_LIMIT = 100
+REQUEST_TIMEOUT_SECONDS = 10
 
 
-# Função para renderizar a página inicial
 def index(request):
     form = SaveDetailForm()
-    data_form = SaveDetail.objects.all().order_by('-created_at')[:8]
-
+    data_form = SaveDetail.objects.all().order_by("-created_at")[:8]
     for detail in data_form:
-        if detail.created_at:
-            detail.formatted_created_at = timezone.localtime(detail.created_at).strftime('%d/%m/%Y %H:%M:%S')
-        else:
-            detail.formatted_created_at = None
-
-    return render(request, 'index.html', {'form': form, 'data_form': data_form})
-
-
-# Chave da API do CoinMarketCap
-API_KEY = 'Cole sua API do CoinMarketCap'
-
-DATA_FILE = 'crypto_data.json'
+        detail.formatted_created_at = (
+            timezone.localtime(detail.created_at).strftime("%d/%m/%Y %H:%M:%S")
+            if detail.created_at
+            else None
+        )
+    return render(request, "index.html", {"form": form, "data_form": data_form})
 
 
-# Função para carregar dados anteriores salvos em um arquivo JSON
 def load_previous_data():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, 'r') as f:
-            return json.load(f)
-    return {}
+    try:
+        with DATA_FILE.open("r", encoding="utf-8") as file:
+            data = json.load(file)
+            return data if isinstance(data, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
 
 
-# Função para salvar os dados atuais em um arquivo JSON
 def save_current_data(data):
-    with open(DATA_FILE, 'w') as f:
-        json.dump(data, f)
+    """Write the snapshot atomically to avoid leaving a partially written JSON file."""
+    DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
+    temp_name = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=DATA_FILE.parent, delete=False
+        ) as file:
+            json.dump(data, file)
+            temp_name = file.name
+        os.replace(temp_name, DATA_FILE)
+    finally:
+        if temp_name and os.path.exists(temp_name):
+            os.unlink(temp_name)
 
 
-# Função para buscar dados de criptomoedas da API CoinMarketCap
 def get_crypto_data(api_key, limit=10):
-    url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
-    params = {
-        'start': '1',
-        'limit': str(limit),
-        'convert': 'USD'
-    }
-    headers = {
-        'Accepts': 'application/json',
-        'X-CMC_PRO_API_KEY': api_key,
-    }
-
-    response = requests.get(url, headers=headers, params=params)
-    if response.status_code == 200:
-        current_data = response.json()['data']
+    params = {"start": "1", "limit": limit, "convert": "USD"}
+    headers = {"Accepts": "application/json", "X-CMC_PRO_API_KEY": api_key}
+    try:
+        response = requests.get(
+            COINMARKETCAP_URL,
+            headers=headers,
+            params=params,
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        current_data = payload.get("data")
+        if not isinstance(current_data, list):
+            return None
 
         previous_data = load_previous_data()
         for crypto in current_data:
-            symbol = crypto['symbol']
-            crypto['previous_market_cap'] = previous_data.get(symbol, {}).get('market_cap', 0)
+            symbol = crypto.get("symbol")
+            quote = crypto.get("quote", {}).get("USD", {})
+            if symbol and isinstance(quote, dict):
+                crypto["previous_market_cap"] = previous_data.get(symbol, {}).get("market_cap", 0)
 
-        # Salvar os dados atuais para comparação futura
-        save_current_data({crypto['symbol']: {'market_cap': crypto['quote']['USD']['market_cap']} for crypto in current_data})
-
+        snapshot = {
+            crypto["symbol"]: {"market_cap": crypto["quote"]["USD"]["market_cap"]}
+            for crypto in current_data
+            if crypto.get("symbol") and isinstance(crypto.get("quote", {}).get("USD"), dict)
+            and "market_cap" in crypto["quote"]["USD"]
+        }
+        save_current_data(snapshot)
         return current_data
-    else:
+    except (requests.RequestException, ValueError, KeyError, TypeError):
         return None
 
 
-# Função para obter dados de criptomoedas e enviar como resposta JSON
+@require_GET
 def get_data(request):
-    limit = request.GET.get('limit', 10)
-    crypto_data = get_crypto_data(API_KEY, limit)
+    raw_limit = request.GET.get("limit", "10")
+    try:
+        limit = int(raw_limit)
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "O parâmetro limit deve ser um número inteiro."}, status=400)
+    if not 1 <= limit <= MAX_CRYPTO_LIMIT:
+        return JsonResponse(
+            {"error": f"O parâmetro limit deve estar entre 1 e {MAX_CRYPTO_LIMIT}."},
+            status=400,
+        )
 
-    if crypto_data is not None:
-        processed_data = [
-            {
-                'name': crypto['name'],
-                'symbol': crypto['symbol'],
-                'market_cap': crypto['quote']['USD']['market_cap'],
-                'previous_market_cap': crypto['previous_market_cap']
-            }
-            for crypto in crypto_data
-        ]
-        return JsonResponse({'treemap': processed_data})
-    else:
-        return JsonResponse({'treemap': 'Falha ao recuperar dados do Treemap'}, status=500)
+    api_key = os.environ.get("COINMARKETCAP_API_KEY", "").strip()
+    if not api_key:
+        return JsonResponse(
+            {"error": "A API do CoinMarketCap não está configurada no servidor."},
+            status=503,
+        )
+
+    crypto_data = get_crypto_data(api_key, limit)
+    if crypto_data is None:
+        return JsonResponse(
+            {"error": "Não foi possível recuperar os dados do mercado. Tente novamente mais tarde."},
+            status=502,
+        )
+
+    processed_data = []
+    for crypto in crypto_data:
+        try:
+            quote = crypto["quote"]["USD"]
+            processed_data.append({
+                "name": str(crypto["name"]),
+                "symbol": str(crypto["symbol"]),
+                "market_cap": float(quote["market_cap"]),
+                "previous_market_cap": float(crypto.get("previous_market_cap", 0) or 0),
+            })
+        except (KeyError, TypeError, ValueError):
+            continue
+    return JsonResponse({"treemap": processed_data})
 
 
-# Função para salvar dados através do formulário e enviar resposta JSON
+@login_required
+@require_POST
 def save_data(request):
-    if request.method == 'POST':
-        form = SaveDetailForm(request.POST)
-        if form.is_valid():
-            form.save()
-            data_chart_text = form.cleaned_data['text']
-            return JsonResponse({'status': 'success', 'text': data_chart_text})
-        else:
-            return JsonResponse({'status': 'error', 'message': form.errors}, status=400)
-    return HttpResponseBadRequest('Método de requisição ou tipo de conteúdo inválido')
+    form = SaveDetailForm(request.POST)
+    if not form.is_valid():
+        return JsonResponse({"status": "error", "message": form.errors.get_json_data()}, status=400)
+    detail = form.save()
+    return JsonResponse({"status": "success", "id": detail.id, "text": detail.text})
 
 
-# Função para deletar dados com base no ID e enviar resposta JSON
+@login_required
+@require_POST
 def delete_data(request, id):
-    if request.method == 'POST':
-        detail = get_object_or_404(SaveDetail, id=id)
-        detail.delete()
-        return JsonResponse({'status': 'success', 'message': 'Dados deletados com sucesso.'})
-    return HttpResponseBadRequest('Método de requisição inválido')
+    detail = get_object_or_404(SaveDetail, id=id)
+    detail.delete()
+    return JsonResponse({"status": "success", "message": "Análise removida."})
