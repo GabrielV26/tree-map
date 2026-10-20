@@ -2,6 +2,9 @@
 
 Aplicação Django que exibe um treemap das principais criptomoedas com dados da API do CoinMarketCap e permite salvar anotações autenticadas.
 
+<img width="1200" height="720" alt="image" src="https://github.com/user-attachments/assets/3d724653-8a22-46cc-ab69-71680f91222a" />
+
+
 ## Requisitos
 - Python 3.10+
 - Uma chave de API do CoinMarketCap
