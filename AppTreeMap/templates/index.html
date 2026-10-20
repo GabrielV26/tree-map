@@ -12,30 +12,40 @@
     <div class="content">
         <div class="ranking">
             <h1>Top criptos</h1>
-            <div id="dataDisplay"></div> <!-- Div para exibir dados da API -->
+            <div id="dataDisplay"></div>
         </div>
         <div class="container">
             <div id="treemap"></div>
             <button id="loadDataButton" title="Recomendação de uso a cada 40 segundos.">Atualizar o mercado</button>
             <div class="form-container">
                 <h2>Criar análise do mercado</h2>
-                <p>Para salvar ou remover análises, faça login pela <a href="/admin/login/">área de administração</a>.</p>
-                <form id="saveDetailForm" method="post" action="{% url 'save_data' %}">
-                    {% csrf_token %}
-                    {{ form.as_p }}
-                    <button type="submit">Salvar</button>
-                </form>
+                {% if user.is_authenticated %}
+                    <p>Suas análises são privadas e visíveis apenas para você.</p>
+                    <form id="saveDetailForm" method="post" action="{% url 'save_data' %}">
+                        {% csrf_token %}
+                        {{ form.as_p }}
+                        <button type="submit">Salvar</button>
+                    </form>
+                {% else %}
+                    <p>Para salvar ou remover suas análises, faça login pela <a href="/admin/login/">área de administração</a>.</p>
+                {% endif %}
                 <div id="formMessage" style="color: white; margin-top: 10px;"></div>
             </div>
             <div id="savedDataContainer">
                 <h2>Últimas Análises</h2>
-                {% for item in data_form %}
-                    <div class="saved-data-item" data-id="{{ item.id }}">
-                        <p><strong>Criado em:</strong> {{ item.created_at|date:"d/m/Y H:i:s" }}</p>
-                        <p><strong>Anotações:</strong> {{ item.text }}</p>
-                        <button class="delete-button" data-id="{{ item.id }}">Remover</button>
-                    </div>
-                {% endfor %}
+                {% if user.is_authenticated %}
+                    {% for item in data_form %}
+                        <div class="saved-data-item" data-id="{{ item.id }}">
+                            <p><strong>Criado em:</strong> {{ item.created_at|date:"d/m/Y H:i:s" }}</p>
+                            <p><strong>Anotações:</strong> {{ item.text }}</p>
+                            <button class="delete-button" data-id="{{ item.id }}">Remover</button>
+                        </div>
+                    {% empty %}
+                        <p>Você ainda não salvou análises.</p>
+                    {% endfor %}
+                {% else %}
+                    <p>Entre na sua conta para ver suas análises salvas.</p>
+                {% endif %}
             </div>
         </div>
     </div>

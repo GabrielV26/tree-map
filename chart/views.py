@@ -5,7 +5,7 @@ from pathlib import Path
 
 import requests
 from django.conf import settings
-from django.http import HttpResponseBadRequest, JsonResponse
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
@@ -21,7 +21,7 @@ REQUEST_TIMEOUT_SECONDS = 10
 
 def index(request):
     form = SaveDetailForm()
-    data_form = SaveDetail.objects.all().order_by("-created_at")[:8]
+    data_form = SaveDetail.objects.filter(user=request.user).order_by("-created_at")[:8] if request.user.is_authenticated else []
     for detail in data_form:
         detail.formatted_created_at = (
             timezone.localtime(detail.created_at).strftime("%d/%m/%Y %H:%M:%S")
@@ -140,7 +140,9 @@ def save_data(request):
     form = SaveDetailForm(request.POST)
     if not form.is_valid():
         return JsonResponse({"status": "error", "message": form.errors.get_json_data()}, status=400)
-    detail = form.save()
+    detail = form.save(commit=False)
+    detail.user = request.user
+    detail.save()
     return JsonResponse({"status": "success", "id": detail.id, "text": detail.text})
 
 
@@ -148,6 +150,6 @@ def save_data(request):
 def delete_data(request, id):
     if not request.user.is_authenticated:
         return JsonResponse({"status": "error", "message": "Autenticação necessária."}, status=401)
-    detail = get_object_or_404(SaveDetail, id=id)
+    detail = get_object_or_404(SaveDetail, id=id, user=request.user)
     detail.delete()
     return JsonResponse({"status": "success", "message": "Análise removida."})
