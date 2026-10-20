@@ -81,6 +81,22 @@ class TreemapSecurityTests(TestCase):
         self.assertContains(response, "my private note")
         self.assertNotContains(response, "another user's note")
 
+    @patch("chart.views.requests.get")
+    def test_first_market_snapshot_has_no_fake_previous_value(self, mock_get):
+        mock_get.return_value.raise_for_status.return_value = None
+        mock_get.return_value.json.return_value = {
+            "data": [{
+                "name": "Bitcoin",
+                "symbol": "BTC",
+                "quote": {"USD": {"market_cap": 100.0}},
+            }]
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "snapshot.json"
+            with patch.object(views, "DATA_FILE", path):
+                data = views.get_crypto_data("test-api-key", limit=1)
+        self.assertEqual(data[0]["previous_market_cap"], None)
+
     def test_previous_data_handles_invalid_json(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "bad.json"

@@ -27,7 +27,7 @@
                         <button type="submit">Salvar</button>
                     </form>
                 {% else %}
-                    <p>Para salvar ou remover suas análises, faça login pela <a href="/login/">área de administração</a>.</p>
+                    <p>Para salvar ou remover suas análises, <a href="/login/">entre na sua conta</a>.</p>
                 {% endif %}
                 <div id="formMessage" style="color: white; margin-top: 10px;"></div>
             </div>
@@ -84,7 +84,8 @@
 
                         cryptos.forEach(function(crypto) {
                             const marketCap = Number(crypto.market_cap || 0);
-                            const previousMarketCap = Number(crypto.previous_market_cap || 0);
+                            const hasPreviousMarketCap = crypto.previous_market_cap !== null && Number.isFinite(Number(crypto.previous_market_cap));
+                            const previousMarketCap = hasPreviousMarketCap ? Number(crypto.previous_market_cap) : null;
                             if (!Number.isFinite(marketCap) || marketCap < 0) return;
 
                             const percentage = (marketCap / totalMarketCap) * 100;
@@ -105,7 +106,7 @@
                                 height: height + 'px',
                                 top: currentTop + 'px',
                                 left: currentLeft + 'px',
-                                backgroundColor: marketCap >= previousMarketCap ? '#28a745' : '#dc3545'
+                                backgroundColor: !hasPreviousMarketCap ? '#6c757d' : (marketCap >= previousMarketCap ? '#28a745' : '#dc3545')
                             });
                             treemap.append(cryptoDiv);
                             currentLeft += width;
@@ -119,13 +120,17 @@
 
                         cryptos.forEach(function(crypto) {
                             const marketCap = Number(crypto.market_cap || 0);
-                            const previous = Number(crypto.previous_market_cap || 0);
+                            const hasPreviousMarketCap = crypto.previous_market_cap !== null && Number.isFinite(Number(crypto.previous_market_cap));
+                            const previous = hasPreviousMarketCap ? Number(crypto.previous_market_cap) : null;
                             const item = $('<div>').addClass('crypto-data');
                             $('<h2>').text(String(crypto.name) + ' (' + String(crypto.symbol) + ')').appendTo(item);
-                            $('<p>').addClass(marketCap >= previous ? 'market-cap-up' : 'market-cap-down')
-                                .text('Capitalização de mercado: ' + formatCurrency(marketCap)).appendTo(item);
-                            $('<p>').addClass(marketCap >= previous ? 'market-cap-up' : 'market-cap-down')
-                                .text('Capitalização de mercado anterior: ' + formatCurrency(previous)).appendTo(item);
+                            $('<p>').text('Capitalização de mercado: ' + formatCurrency(marketCap)).appendTo(item);
+                            if (hasPreviousMarketCap) {
+                                $('<p>').addClass(marketCap >= previous ? 'market-cap-up' : 'market-cap-down')
+                                    .text('Capitalização na consulta anterior: ' + formatCurrency(previous)).appendTo(item);
+                            } else {
+                                $('<p>').text('Ainda não há consulta anterior para comparação.').appendTo(item);
+                            }
                             dataDisplay.append(item);
                         });
                     },
@@ -152,7 +157,7 @@
                         },
                         error: function(xhr) {
                             if (xhr.status === 302 || xhr.status === 401 || xhr.status === 403) {
-                                alert('Entre na área administrativa do Django para autenticar antes de remover análises.');
+                                alert('Entre na sua conta para remover análises.');
                             } else {
                                 alert('Não foi possível remover a análise. Código: ' + xhr.status);
                             }

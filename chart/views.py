@@ -77,7 +77,7 @@ def get_crypto_data(api_key, limit=10):
             symbol = crypto.get("symbol")
             quote = crypto.get("quote", {}).get("USD", {})
             if symbol and isinstance(quote, dict):
-                crypto["previous_market_cap"] = previous_data.get(symbol, {}).get("market_cap", 0)
+                crypto["previous_market_cap"] = previous_data.get(symbol, {}).get("market_cap")
 
         snapshot = {
             crypto["symbol"]: {"market_cap": crypto["quote"]["USD"]["market_cap"]}
@@ -87,7 +87,7 @@ def get_crypto_data(api_key, limit=10):
         }
         save_current_data(snapshot)
         return current_data
-    except (requests.RequestException, ValueError, KeyError, TypeError):
+    except (requests.RequestException, ValueError, KeyError, TypeError, OSError):
         return None
 
 
@@ -126,7 +126,11 @@ def get_data(request):
                 "name": str(crypto["name"]),
                 "symbol": str(crypto["symbol"]),
                 "market_cap": float(quote["market_cap"]),
-                "previous_market_cap": float(crypto.get("previous_market_cap", 0) or 0),
+                "previous_market_cap": (
+                    float(crypto["previous_market_cap"])
+                    if crypto.get("previous_market_cap") is not None
+                    else None
+                ),
             })
         except (KeyError, TypeError, ValueError):
             continue
