@@ -42,7 +42,7 @@ $env:COINMARKETCAP_API_KEY = "sua-chave-aqui"
 
    `python manage.py runserver`
 
-7. Acesse `http://127.0.0.1:8000/`. Para salvar ou remover anotações, entre em `/admin/login/`.
+7. Acesse `http://127.0.0.1:8000/`. Para salvar ou remover anotações, entre em `/login/`. O login comum é separado do painel administrativo `/admin/`.
 
 ## Configuração de produção
 

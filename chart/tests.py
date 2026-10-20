@@ -31,6 +31,22 @@ class TreemapSecurityTests(TestCase):
         response = self.client.get("/api/crypto/")
         self.assertEqual(response.status_code, 503)
 
+    def test_regular_user_can_access_login_page(self):
+        self.client.logout()
+        response = self.client.get("/login/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Entrar")
+
+    def test_regular_user_can_log_in_without_admin_privileges(self):
+        self.client.logout()
+        response = self.client.post("/login/", {
+            "username": "tester",
+            "password": "Test-password-123!",
+        })
+        self.assertEqual(response.status_code, 302)
+        response = self.client.get("/")
+        self.assertContains(response, "Criar análise do mercado")
+
     def test_save_requires_post(self):
         response = self.client.get("/save/")
         self.assertEqual(response.status_code, 405)
