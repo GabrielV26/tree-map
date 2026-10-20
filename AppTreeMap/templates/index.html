@@ -12,30 +12,40 @@
     <div class="content">
         <div class="ranking">
             <h1>Top criptos</h1>
-            <div id="dataDisplay"></div> <!-- Div para exibir dados da API -->
+            <div id="dataDisplay"></div>
         </div>
         <div class="container">
             <div id="treemap"></div>
             <button id="loadDataButton" title="Recomendação de uso a cada 40 segundos.">Atualizar o mercado</button>
             <div class="form-container">
                 <h2>Criar análise do mercado</h2>
-                <p>Para salvar ou remover análises, faça login pela <a href="/admin/login/">área de administração</a>.</p>
-                <form id="saveDetailForm" method="post" action="{% url 'save_data' %}">
-                    {% csrf_token %}
-                    {{ form.as_p }}
-                    <button type="submit">Salvar</button>
-                </form>
+                {% if user.is_authenticated %}
+                    <p>Suas análises são privadas e visíveis apenas para você.</p>
+                    <form id="saveDetailForm" method="post" action="{% url 'save_data' %}">
+                        {% csrf_token %}
+                        {{ form.as_p }}
+                        <button type="submit">Salvar</button>
+                    </form>
+                {% else %}
+                    <p>Para salvar ou remover suas análises, <a href="/login/">entre na sua conta</a>.</p>
+                {% endif %}
                 <div id="formMessage" style="color: white; margin-top: 10px;"></div>
             </div>
             <div id="savedDataContainer">
                 <h2>Últimas Análises</h2>
-                {% for item in data_form %}
-                    <div class="saved-data-item" data-id="{{ item.id }}">
-                        <p><strong>Criado em:</strong> {{ item.created_at|date:"d/m/Y H:i:s" }}</p>
-                        <p><strong>Anotações:</strong> {{ item.text }}</p>
-                        <button class="delete-button" data-id="{{ item.id }}">Remover</button>
-                    </div>
-                {% endfor %}
+                {% if user.is_authenticated %}
+                    {% for item in data_form %}
+                        <div class="saved-data-item" data-id="{{ item.id }}">
+                            <p><strong>Criado em:</strong> {{ item.created_at|date:"d/m/Y H:i:s" }}</p>
+                            <p><strong>Anotações:</strong> {{ item.text }}</p>
+                            <button class="delete-button" data-id="{{ item.id }}">Remover</button>
+                        </div>
+                    {% empty %}
+                        <p>Você ainda não salvou análises.</p>
+                    {% endfor %}
+                {% else %}
+                    <p>Entre na sua conta para ver suas análises salvas.</p>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -74,7 +84,8 @@
 
                         cryptos.forEach(function(crypto) {
                             const marketCap = Number(crypto.market_cap || 0);
-                            const previousMarketCap = Number(crypto.previous_market_cap || 0);
+                            const hasPreviousMarketCap = crypto.previous_market_cap !== null && Number.isFinite(Number(crypto.previous_market_cap));
+                            const previousMarketCap = hasPreviousMarketCap ? Number(crypto.previous_market_cap) : null;
                             if (!Number.isFinite(marketCap) || marketCap < 0) return;
 
                             const percentage = (marketCap / totalMarketCap) * 100;
@@ -95,7 +106,7 @@
                                 height: height + 'px',
                                 top: currentTop + 'px',
                                 left: currentLeft + 'px',
-                                backgroundColor: marketCap >= previousMarketCap ? '#28a745' : '#dc3545'
+                                backgroundColor: !hasPreviousMarketCap ? '#6c757d' : (marketCap >= previousMarketCap ? '#28a745' : '#dc3545')
                             });
                             treemap.append(cryptoDiv);
                             currentLeft += width;
@@ -109,13 +120,17 @@
 
                         cryptos.forEach(function(crypto) {
                             const marketCap = Number(crypto.market_cap || 0);
-                            const previous = Number(crypto.previous_market_cap || 0);
+                            const hasPreviousMarketCap = crypto.previous_market_cap !== null && Number.isFinite(Number(crypto.previous_market_cap));
+                            const previous = hasPreviousMarketCap ? Number(crypto.previous_market_cap) : null;
                             const item = $('<div>').addClass('crypto-data');
                             $('<h2>').text(String(crypto.name) + ' (' + String(crypto.symbol) + ')').appendTo(item);
-                            $('<p>').addClass(marketCap >= previous ? 'market-cap-up' : 'market-cap-down')
-                                .text('Capitalização de mercado: ' + formatCurrency(marketCap)).appendTo(item);
-                            $('<p>').addClass(marketCap >= previous ? 'market-cap-up' : 'market-cap-down')
-                                .text('Capitalização de mercado anterior: ' + formatCurrency(previous)).appendTo(item);
+                            $('<p>').text('Capitalização de mercado: ' + formatCurrency(marketCap)).appendTo(item);
+                            if (hasPreviousMarketCap) {
+                                $('<p>').addClass(marketCap >= previous ? 'market-cap-up' : 'market-cap-down')
+                                    .text('Capitalização na consulta anterior: ' + formatCurrency(previous)).appendTo(item);
+                            } else {
+                                $('<p>').text('Ainda não há consulta anterior para comparação.').appendTo(item);
+                            }
                             dataDisplay.append(item);
                         });
                     },
@@ -142,7 +157,7 @@
                         },
                         error: function(xhr) {
                             if (xhr.status === 302 || xhr.status === 401 || xhr.status === 403) {
-                                alert('Entre na área administrativa do Django para autenticar antes de remover análises.');
+                                alert('Entre na sua conta para remover análises.');
                             } else {
                                 alert('Não foi possível remover a análise. Código: ' + xhr.status);
                             }
